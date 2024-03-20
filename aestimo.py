@@ -52,10 +52,22 @@ import time
 
 time0 = time.time()  # timing audit
 # from scipy.optimize import fsolve
-import matplotlib.pyplot as pl
+import matplotlib.pyplot as plt
+pl = plt
+import matplotlib
 import numpy as np
+import pandas as pd
+import seaborn as sns
 
-alen = np.alen
+def alen(arr):
+  try:
+    lena = arr.shape[0]
+  except AttributeError:
+    lena = len(arr)
+  except :
+    raise 
+  finally:
+    return lena
 import os, sys
 
 #importing examples directory
@@ -271,7 +283,7 @@ class AttrDict(dict):
 
 
 class StructureFrom(Structure):
-    def __init__(self, inputfile, database):
+    def __init__(self, inputfile, adatabase):
         """database is a module or object containing the semiconductor material
         properties. Normally this is just aestimo's database.py module.
         
@@ -332,6 +344,8 @@ class StructureFrom(Structure):
         # Parameters for simulation
         self.Fapp = inputfile.Fapplied
         self.T = inputfile.T
+        if self.T!=300:
+          logger.info('check that material database (.py), usually given for 300K')
         self.subnumber_e = inputfile.subnumber_e
         self.comp_scheme = inputfile.computation_scheme
         self.fermi_np_scheme = inputfile.fermi_np_scheme
@@ -358,10 +372,14 @@ class StructureFrom(Structure):
             logger.error(" Grid number is exceeding the max number of %d", max_val)
             exit()
         # Loading materials database
-        self.material_property = database.materialproperty
+        db = adatabase()
+        db.set_options(inputfile.T if 'T' in  inputfile.__dict__ else 300, 
+                          inputfile.valley if 'valley' in  inputfile.__dict__ else 'Gamma')
+
+        self.material_property = db.materialproperty
         totalmaterial = alen(self.material_property)
 
-        self.alloy_property = database.alloyproperty
+        self.alloy_property = db.alloyproperty
         totalalloy = alen(self.alloy_property)
 
         logger.info(
@@ -412,74 +430,83 @@ class StructureFrom(Structure):
 
         position = 0.0  # keeping in nanometres (to minimise errors)
         for layer in self.material:
-            startindex = round2int(position * 1e-9 / dx)
-            position += layer[0]  # update position to end of the layer
-            finishindex = round2int(position * 1e-9 / dx)
-            #
-            matType = layer[1]
+          # ite = self.material.__iter__()
+          # layer = next(ite)
+          startindex = round2int(position * 1e-9 / dx)
+          position += layer[0]  # update position to end of the layer
+          finishindex = round2int(position * 1e-9 / dx)
+          #
+          matType = layer[1]
 
-            if matType in material_property:
-                matprops = material_property[matType]
-                fi[startindex:finishindex] = (
-                    matprops["Band_offset"] * matprops["Eg"] * q
-                )  # Joule
-                eps[startindex:finishindex] = matprops["epsilonStatic"] * eps0
-                cb_meff[startindex:finishindex] = matprops["m_e"] * m_e
-                if self.meff_method == 1:
-                    cb_meff_alpha[startindex:finishindex] = matprops["m_e_alpha"]
-                elif self.meff_method == 2:
-                    F[startindex:finishindex] = matprops["F"]
-                    Eg[startindex:finishindex] = matprops["Eg"]  # eV
-                    delta_SO[startindex:finishindex] = matprops["delta"]
-                    Ep[startindex:finishindex] = matprops["Ep"]
-            elif matType in alloy_property:
-                alloyprops = alloy_property[matType]
-                mat1 = material_property[alloyprops["Material1"]]
-                mat2 = material_property[alloyprops["Material2"]]
-                x = layer[2]  # alloy ratio
-                fi[startindex:finishindex] = (
-                    alloyprops["Band_offset"]
-                    * (
-                        x * mat1["Eg"]
-                        + (1 - x) * mat2["Eg"]
-                        - alloyprops["Bowing_param"] * x * (1 - x)
-                    )
-                    * q
-                )  # for electron. Joule
-                eps[startindex:finishindex] = (
-                    x * mat1["epsilonStatic"] + (1 - x) * mat2["epsilonStatic"]
-                ) * eps0
-                cb_meff_alloy = x * mat1["m_e"] + (1 - x) * mat2["m_e"]
-                cb_meff[startindex:finishindex] = cb_meff_alloy * m_e
-                if self.meff_method == 1:
-                    cb_meff_alpha[startindex:finishindex] = alloyprops["m_e_alpha"] * (
-                        mat2["m_e"] / cb_meff_alloy
-                    )  # non-parabolicity constant for alloy. THIS CALCULATION IS MOSTLY WRONG. MUST BE CONTROLLED. SBL
-                elif self.meff_method == 2:
-                    F[startindex:finishindex] = x * mat1["F"] + (1 - x) * mat2["F"]
-                    Eg[startindex:finishindex] = (
-                        x * mat1["Eg"]
-                        + (1 - x) * mat2["Eg"]
-                        - alloyprops["Bowing_param"] * x * (1 - x)
-                    )  # eV
-                    delta_SO[startindex:finishindex] = (
-                        x * mat1["delta"]
-                        + (1 - x) * mat2["delta"]
-                        - alloyprops["delta_bowing_param"] * x * (1 - x)
-                    )
-                    Ep[startindex:finishindex] = x * mat1["Ep"] + (1 - x) * mat2["Ep"]
-            # doping
-            if layer[4] == "n":
-                chargedensity = (
-                    layer[3] * 1e6
-                )  # charge density in m**-3 (conversion from cm**-3)
-            elif layer[4] == "p":
-                chargedensity = (
-                    -layer[3] * 1e6
-                )  # charge density in m**-3 (conversion from cm**-3)
-            else:
-                chargedensity = 0.0
-            dop[startindex:finishindex] = chargedensity
+          if matType in material_property:
+            matprops = material_property[matType]
+            if 'cbo' in matprops:
+              fi[startindex:finishindex] = matprops['cbo']*q
+            else :
+              fi[startindex:finishindex] = (
+                  matprops["Band_offset"] * matprops["Eg"] * q
+              )  # Joule
+            eps[startindex:finishindex] = matprops["epsilonStatic"] * eps0
+            cb_meff[startindex:finishindex] = matprops["m_e"] * m_e
+            if self.meff_method == 1:
+              cb_meff_alpha[startindex:finishindex] = matprops["m_e_alpha"]
+            elif self.meff_method == 2:
+              F[startindex:finishindex] = matprops["F"]
+              Eg[startindex:finishindex] = matprops["Eg"]  # eV
+              delta_SO[startindex:finishindex] = matprops["delta"]
+              Ep[startindex:finishindex] = matprops["Ep"]
+          elif matType in alloy_property:
+            alloyprops = alloy_property[matType]
+            mat1 = material_property[alloyprops["Material1"]]
+            mat2 = material_property[alloyprops["Material2"]]
+            x = layer[2]  # alloy ratio
+            if 'cbo' in mat1 and 'cbo' in mat2:
+              fi[startindex:finishindex] = (mat1['cbo']*x + (1-x)*mat2['cbo']+\
+                                      alloyprops['cbo'] * x * (1 - x))*q
+            else :
+              fi[startindex:finishindex] = (
+                alloyprops["Band_offset"]
+                * (
+                    x * mat1["Eg"]
+                    + (1 - x) * mat2["Eg"]
+                    - alloyprops["Bowing_param"] * x * (1 - x)
+                )
+                * q
+            )  # for electron. Joule
+            eps[startindex:finishindex] = (
+                x * mat1["epsilonStatic"] + (1 - x) * mat2["epsilonStatic"]
+            ) * eps0
+            cb_meff_alloy = x * mat1["m_e"] + (1 - x) * mat2["m_e"]
+            cb_meff[startindex:finishindex] = cb_meff_alloy * m_e
+            if self.meff_method == 1:
+                cb_meff_alpha[startindex:finishindex] = alloyprops["m_e_alpha"] * (
+                    mat2["m_e"] / cb_meff_alloy
+                )  # non-parabolicity constant for alloy. THIS CALCULATION IS MOSTLY WRONG. MUST BE CONTROLLED. SBL
+            elif self.meff_method == 2:
+                F[startindex:finishindex] = x * mat1["F"] + (1 - x) * mat2["F"]
+                Eg[startindex:finishindex] = (
+                    x * mat1["Eg"]
+                    + (1 - x) * mat2["Eg"]
+                    - alloyprops["Bowing_param"] * x * (1 - x)
+                )  # eV
+                delta_SO[startindex:finishindex] = (
+                    x * mat1["delta"]
+                    + (1 - x) * mat2["delta"]
+                    - alloyprops["delta_bowing_param"] * x * (1 - x)
+                )
+                Ep[startindex:finishindex] = x * mat1["Ep"] + (1 - x) * mat2["Ep"]
+          # doping
+          if layer[4] == "n":
+              chargedensity = (
+                  layer[3] * 1e6
+              )  # charge density in m**-3 (conversion from cm**-3)
+          elif layer[4] == "p":
+              chargedensity = (
+                  -layer[3] * 1e6
+              )  # charge density in m**-3 (conversion from cm**-3)
+          else:
+              chargedensity = 0.0
+          dop[startindex:finishindex] = chargedensity
         self.fi = fi
         self.eps = eps
         self.dop = dop
@@ -535,6 +562,7 @@ def psi_at_inf(E, fis, cb_meff, n_max, dx):
     n_max - number of points in arrays describing structure wrt z-axis
     dx - step size of distance quantisation (metres)
     """
+    # print(E, fis, cb_meff, n_max, dx)
     fis = fis.tolist()  # lists are faster than numpy arrays for loops
     cb_meff = cb_meff.tolist()  # lists are faster than numpy arrays for loops
     c0 = 2 * (dx / hbar) ** 2
@@ -1401,6 +1429,7 @@ def save_and_plot(result, model):
 
 def QWplot(result, figno=None):
     """QW representation"""
+    
     xaxis = result.xaxis
     fig = pl.figure(figno)
     pl.suptitle("Aestimo Results")
@@ -1417,6 +1446,37 @@ def QWplot(result, figno=None):
     pl.show()
     return fig
 
+
+def QWplot_compare(results,  labels, plot_only = None, plot_kws = None, cm = 'Set1'):
+    """QW representation"""
+    fig, ax = plt.subplots(figsize = (10, 10))
+    dfs = []
+    for res in results:
+      df = pd.Series(res.fitot/1.6e-19*1e3, name = 'Phi', 
+                     index=pd.Index(res.xaxis, name='x'))\
+             .to_frame()
+      df['level'] = 'Potential'
+      states = pd.DataFrame(res.wfe.T)*config.wavefunction_scalefactor \
+                                  + pd.Series(res.E_state)
+      if plot_only is not None:
+        states = states.loc[:,plot_only]
+      states.columns = 'Level_'+states.columns.astype(str)\
+                                      .rename('level')
+      states.index=df.index
+      df = pd.concat([df, states.stack().rename('Phi').reset_index('level')])
+      dfs.append(df)
+    dfp = pd.concat(dfs, keys = labels.tolist(), names = [labels.name])\
+            .reset_index()
+    cmap = matplotlib.colormaps[cm]
+    res = np.append([0.99], np.linspace(0,0.9, dfp.level.nunique()))
+    colors = [cmap(r) for r in res]
+    palette = {k:v for k, v in zip(dfp.level.unique(), colors)}   
+    palette['Potential'] =    'k'
+    sns.lineplot(data=dfp, x='x', y='Phi', hue='level', style = labels.name,
+                 ax=ax, palette = palette)
+    ax.set_ylabel("Energy (meV)")
+    ax.grid(False)
+    return fig
 
 def dispersionplot(result, figno=None):
     """subband dispersion plot"""
