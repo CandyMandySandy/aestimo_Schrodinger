@@ -1433,7 +1433,7 @@ def QWplot(result, figno=None):
     xaxis = result.xaxis
     fig = pl.figure(figno)
     pl.suptitle("Aestimo Results")
-    ax = pl.subplot(1, 1, 1)
+    fig, ax = plt.subplots(figsize = (10, 10))
     ax.plot(xaxis, result.fitot * J2meV, "k")
     for level, state in zip(result.E_state, result.wfe):
         ax.axhline(level, 0.1, 0.9, color="g", ls="--")
@@ -1443,6 +1443,7 @@ def QWplot(result, figno=None):
     pl.xlabel("Position (m)")
     pl.ylabel("Energy (meV)")
     ax.grid(True)
+    fig.tight_layout()
     pl.show()
     return fig
 
@@ -1476,6 +1477,7 @@ def QWplot_compare(results,  labels, plot_only = None, plot_kws = None, cm = 'Se
                  ax=ax, palette = palette)
     ax.set_ylabel("Energy (meV)")
     ax.grid(False)
+    fig.tight_layout()
     return fig
 
 def dispersionplot(result, figno=None):

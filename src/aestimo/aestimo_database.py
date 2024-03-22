@@ -427,6 +427,8 @@ materialproperty = dict(
   'VSATP':6e5 , # Saturation Velocity of Holes
   'AVb_E':-7.52#Average Valence Band Energy or the absolute energy level
   },
+  AlOx={'epsilonStatic':9.34,}
+  ,
   MgO={
   'm_e':0.24,
   'm_e_alpha':5.3782e18,
@@ -655,13 +657,33 @@ alloyproperty = {
   'AVb_E':-2.1#Average Valence Band Energy or the absolute energy level
   },
   'GaAsP':{
-  'Bowing_param':0.58,
+  'Bowing_param':0.18,
   'Band_offset':0.63,
   'm_e_alpha':0.0,
   'delta_bowing_param':0.0,
   'a0_sub':5.6533,
   'Material1':'GaP',
   'Material2':'GaAs',
+  'TAUN0':0.1E-6,
+  'TAUP0':0.1E-6,
+  'mun0':0.15,
+  'mup0':0.1,
+  'Cn0':2.8e-31,# generation recombination model parameters [cm**6/s]
+  'Cp0':2.8e-32,# generation recombination model parameters [cm**6/s]
+  'BETAN':2.0,
+  'BETAP':1.0,# Parameter in calculatation of the Field Dependant Mobility
+  'VSATN':3e5,# Saturation Velocity of Electrons
+  'VSATP':6e5 , # Saturation Velocity of Holes
+  'AVb_E':-2.1#Average Valence Band Energy or the absolute energy level
+  },
+  'AlAsP':{
+  'Bowing_param':0.22,
+  'Band_offset':0.63,
+  'm_e_alpha':0.0,
+  'delta_bowing_param':0.0,
+  'a0_sub':5.6533,
+  'Material1':'AlP',
+  'Material2':'AlAs',
   'TAUN0':0.1E-6,
   'TAUP0':0.1E-6,
   'mun0':0.15,
